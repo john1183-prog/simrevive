@@ -2,12 +2,10 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.john1183.simrevive">
 
-    <!-- Permissions -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.READ_PHONE_STATE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-    <!-- Needed so notification action can launch activities from background -->
-    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+    <!-- Bug 6 fix: removed SYSTEM_ALERT_WINDOW — declared but never used -->
 
     <application
         android:allowBackup="true"
@@ -15,7 +13,6 @@
         android:theme="@style/Theme.SimRevive"
         android:supportsRtl="true">
 
-        <!-- Main screen -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -26,22 +23,24 @@
             </intent-filter>
         </activity>
 
-        <!-- Boot listener — fires after every restart -->
+        <!-- Boot listener -->
         <receiver
             android:name=".BootReceiver"
             android:exported="true"
             android:enabled="true">
             <intent-filter>
-                <!-- Standard boot -->
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
-                <!-- Transsion/MediaTek fast-boot -->
                 <action android:name="android.intent.action.QUICKBOOT_POWERON" />
-                <!-- HMD/others -->
                 <action android:name="com.htc.intent.action.QUICKBOOT_POWERON" />
             </intent-filter>
         </receiver>
 
-        <!-- Handles the "Fix Now" notification button -->
+        <!-- Bug 5 fix: AlarmManager fires this 35s after boot (survives process death) -->
+        <receiver
+            android:name=".SimCheckReceiver"
+            android:exported="false" />
+
+        <!-- Handles "Fix Now" notification button -->
         <receiver
             android:name=".QuickFixReceiver"
             android:exported="false" />
