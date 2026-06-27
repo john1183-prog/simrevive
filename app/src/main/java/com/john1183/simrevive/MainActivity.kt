@@ -1,15 +1,20 @@
 package com.john1183.simrevive
 
+import android.Manifest
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
 import android.telephony.TelephonyManager
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -27,10 +32,24 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 
 class MainActivity : ComponentActivity() {
+
+    // Bug 4 fix: request POST_NOTIFICATIONS at runtime (Android 13+)
+    private val notifPermLauncher =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { /* granted or not */ }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
+                != PackageManager.PERMISSION_GRANTED
+        ) {
+            notifPermLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
+
         setContent {
             MaterialTheme {
                 SimReviveApp()
@@ -67,7 +86,10 @@ fun tryMtkEngineerMode(ctx: Context): Boolean = runCatching {
     )
     for ((pkg, cls) in pkgs) {
         if (ctx.packageManager.getLaunchIntentForPackage(pkg) != null) {
-            val i = Intent().apply { component = ComponentName(pkg, cls) }
+            val i = Intent().apply {
+                component = ComponentName(pkg, cls)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)   // Bug 2 fix: required from non-Activity context
+            }
             ctx.startActivity(i)
             return true
         }
@@ -78,15 +100,20 @@ fun tryMtkEngineerMode(ctx: Context): Boolean = runCatching {
 // ── Attempt 3: launch Android's built-in Phone Testing (4636) via dialer
 fun tryDialerCode(ctx: Context): Boolean = runCatching {
     val i = Intent(Intent.ACTION_DIAL, Uri.parse("tel:*%23*%234636%23*%23*"))
+    i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)   // Bug 3 fix: required from non-Activity context
     ctx.startActivity(i)
     true
 }.getOrDefault(false)
 
 // ── Attempt 4: open SIM/mobile network settings as a last resort
 fun openSimSettings(ctx: Context) = runCatching {
-    ctx.startActivity(Intent(Settings.ACTION_NETWORK_OPERATOR_SETTINGS))
+    val i = Intent(Settings.ACTION_NETWORK_OPERATOR_SETTINGS)
+    i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    ctx.startActivity(i)
 }.onFailure {
-    ctx.startActivity(Intent(Settings.ACTION_WIRELESS_SETTINGS))
+    val i = Intent(Settings.ACTION_WIRELESS_SETTINGS)
+    i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    ctx.startActivity(i)
 }
 
 @Composable
@@ -99,8 +126,6 @@ fun SimReviveApp() {
     var attemptLog by remember { mutableStateOf("") }
 
     val (simText, simColor) = getSimStateText(simState)
-    val isReady = simState == TelephonyManager.SIM_STATE_READY ||
-                  simState == TelephonyManager.SIM_STATE_PIN_REQUIRED
 
     Column(
         modifier = Modifier
@@ -157,9 +182,7 @@ fun SimReviveApp() {
             },
             modifier = Modifier.fillMaxWidth(),
             colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
-            border = ButtonDefaults.outlinedButtonBorder.copy(
-                brush = androidx.compose.ui.graphics.SolidColor(Color(0xFF444466))
-            )
+            border = BorderStroke(1.dp, Color(0xFF444466))   // Bug 1 fix: BorderStroke has no .copy()
         ) {
             Text("Refresh SIM Status")
         }
