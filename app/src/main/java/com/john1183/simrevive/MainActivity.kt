@@ -73,7 +73,8 @@ fun getSimStateText(state: Int): Pair<String, Color> = when (state) {
 fun trySecretCodeBroadcast(ctx: Context): Boolean = runCatching {
     val i = Intent("android.provider.Telephony.SECRET_CODE")
     i.data = Uri.parse("android_secret_code://4636")
-    i.addFlags(Intent.FLAG_RECEIVER_INCLUDE_BACKGROUND or Intent.FLAG_RECEIVER_FOREGROUND)
+    // FLAG_RECEIVER_INCLUDE_BACKGROUND was removed from the SDK — doesn't exist at compileSdk 35.
+    i.addFlags(Intent.FLAG_RECEIVER_FOREGROUND)
     ctx.sendBroadcast(i)
     true
 }.getOrDefault(false)
